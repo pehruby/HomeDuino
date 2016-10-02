@@ -1,0 +1,52 @@
+POST /service/v2/value HTTP/1.1
+Host: phnimb.appspot.com
+Connection: close
+User-Agent: Arduino/1.0
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 64
+
+key=testkey&json={"d":258,"n":""}&id=petr.hruby@gmail.com/DPTemp
+
+
+
+
+POST /service/v2/value HTTP/1.1
+Host: phnimb.appspot.com
+Connection: close
+User-Agent: Arduino/1.0
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 92
+
+email=petr.hruby@gmail.com&key=testkey&json={"d":258,"n":"x"}&id=petr.hruby@gmail.com/DPTemp
+
+         1         2         3         4         5         6         7         8         9  
+1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+
+POST /service/v2/value HTTP/1.1
+Host: phnimb.appspot.com
+Connection: close
+User-Agent: Arduino/1.0
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 57
+key=testkey&json={"d":258}&id=petr.hruby@gmail.com/DPTemp
+
+
+
+==================================================================
+http://www.requestmaker.com/
+==================================================================
+
+
+POST /service/v2/value HTTP/1.1
+Host: phnimb.appspot.com
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Connection: close
+Cache-Control: max-age=0
+Content-Length: 92
+
+email=petr.hruby@gmail.com&key=testkey&json={"d":259,"n":"x"}&id=petr.hruby@gmail.com/DPTemp
+

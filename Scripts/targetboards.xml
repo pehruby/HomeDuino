@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Project DefaultTargets="Start" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<ItemGroup>
+	<CurrentBoard Include="Mega2560">
+		<Name>Mega2560</Name>
+		<Programmer>Mega2560BootLoader</Programmer>
+		<FrequencyDirectory>16</FrequencyDirectory>
+		<Frequency>16000000</Frequency>
+		<MiscParams></MiscParams>
+		<OverrideVerbosity></OverrideVerbosity>
+	</CurrentBoard>
+	<SupportedBoards Include="Mega2560">
+	    <Name>Mega2560</Name>
+		<Programmer>Mega2560BootLoader</Programmer>
+		<FrequencyDirectory>16</FrequencyDirectory>
+		<Frequency>16000000</Frequency>
+		<MiscParams></MiscParams>
+		<OverrideVerbosity></OverrideVerbosity>
+	</SupportedBoards>
+ 	</ItemGroup>
+</Project>
+

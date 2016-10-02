@@ -1,0 +1,20 @@
+
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Atmel Studio Solution File, Format Version 11.00
+Project("8363A51B-341F-4EC0-BC6C-EFC34855B85D") = "HomeDuinoI", "HomeDuinoI.cppproj", "1D677523-85D8-430F-AFAB-E5BB74B19039"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|AVR = Debug|AVR
+		Release|AVR = Release|AVR
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		1D677523-85D8-430F-AFAB-E5BB74B19039.Debug|AVR.ActiveCfg = Debug|AVR
+		1D677523-85D8-430F-AFAB-E5BB74B19039.Debug|AVR.Build.0 = Debug|AVR
+		1D677523-85D8-430F-AFAB-E5BB74B19039.Release|AVR.ActiveCfg = Release|AVR
+		1D677523-85D8-430F-AFAB-E5BB74B19039.Release|AVR.Build.0 = Release|AVR
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal 

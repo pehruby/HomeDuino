@@ -1,0 +1,603 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Start" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<Import Project="$(MSBuildExtensionsPath)\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets"/>
+	<Import Project="$(MSBuildExtensionsPath)\ExtensionPack\4.0\MSBuild.ExtensionPack.tasks"/>
+	<Import Project="$(TEX_HOME)\boards.xml" />
+	<Import Project="targetboards.xml" />
+	
+	<PropertyGroup>
+		<!-- Default project name.  This is passed by masterbuild.bat in the command line-->
+		<ProjectName></ProjectName>
+
+		<!-- Root Name for Arduino library -->
+		<LibraryName></LibraryName>
+
+		<LibraryExtension>a</LibraryExtension>
+
+		<!-- Path to atmelstudio.exe - expected from masterbuild.bat-->
+		<AtmelStudio></AtmelStudio>
+
+		<!-- Step to start - expected from batch file or defaulted to  ReplacePinsHeader-->
+		<TargetStep></TargetStep>
+
+		<ReportFolder>_Reports</ReportFolder>
+		<StageFolder>_Stage</StageFolder>
+		<CommandLineSignalFile>CommandLineIsOn.txt</CommandLineSignalFile>
+		<RootFolder></RootFolder>
+		
+		<!-- When deploying a build - which version should be used debug|release -->
+		<DeploymentBuildMode>release</DeploymentBuildMode>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- The following includes come from boards.xml in TEX_HOME directory -->
+		<Compile Include="@(Arduino)" />
+		<Compile Include="@(BoardList)" />
+		<Compile Include="@(BuildTypeList)" />
+		<Compile Include="@(SpeedList)" />
+
+		<Compile Include="@(CurrentBoard)" />
+		<Compile Include="@(SupportedBoards)" />
+	</ItemGroup>
+
+	<!-- Combine the list of boards with the list of build types and the list of CPU frequencies -->
+	<Target Name="CreateProps" >
+
+		<!-- Get number of build types -->
+		<MSBuild.ExtensionPack.Framework.MsBuildHelper TaskAction="GetItemCount" InputItems1="@(BuildTypeList)">
+			<Output TaskParameter="ItemCount" PropertyName="BuildTypeListCount"/>
+		</MSBuild.ExtensionPack.Framework.MsBuildHelper>
+
+		<!-- Get number of boards -->
+		<MSBuild.ExtensionPack.Framework.MsBuildHelper TaskAction="GetItemCount" InputItems1="@(BoardList)">
+			<Output TaskParameter="ItemCount" PropertyName="BoardListCount"/>
+		</MSBuild.ExtensionPack.Framework.MsBuildHelper>
+
+		<!-- Get number of speeds -->
+		<MSBuild.ExtensionPack.Framework.MsBuildHelper TaskAction="GetItemCount" InputItems1="@(SpeedList)">
+			<Output TaskParameter="ItemCount" PropertyName="SpeedListCount"/>
+		</MSBuild.ExtensionPack.Framework.MsBuildHelper>
+
+		<!-- Add build type to list of boards -->
+		<CreateItem Include="@(BoardList)" AdditionalMetadata="BuildMode=%(BuildTypeList.Identity);PostFix=%(BuildTypeList.PostFix)">
+			<Output ItemName="BoardsWithBuildMode" TaskParameter="Include"/>
+		</CreateItem>
+
+		<!-- Add build type to list of boards -->
+		<CreateItem Include="@(BoardsWithBuildMode)" AdditionalMetadata="ArduinoVersion=%(Arduino.Version)">
+			<Output ItemName="BoardsWithBuildModeAndVersion" TaskParameter="Include"/>
+		</CreateItem>
+
+		<!-- Add build type to list of boards with supported boards-->
+		<CreateItem Include="@(BoardsWithBuildModeAndVersion)" AdditionalMetadata="CurrentBoard=%(CurrentBoard.Identity);CurrentFrequency=%(CurrentBoard.Frequency)">
+			<Output ItemName="BoardsWithBuildModeAndVersionAndCurrentBoard" TaskParameter="Include"/>
+		</CreateItem>		
+
+		<!-- Add build type to list of boards with supported boards-->
+		<CreateItem Include="@(BoardsWithBuildModeAndVersion)" AdditionalMetadata="SupportedBoard=%(SupportedBoards.Identity);SupportedFrequency=%(SupportedBoards.Frequency)">
+			<Output ItemName="BoardsWithBuildModeAndVersionAndSupportedBoards" TaskParameter="Include"/>
+		</CreateItem>
+		
+		<!-- Add requency information to boards with list types.  This is the request list-->
+		<CreateItem Include="@(BoardsWithBuildModeAndVersionAndSupportedBoards)" AdditionalMetadata="FreqMarker=%(SpeedList.Identity);FreqSpeed=%(SpeedList.Frequency)">
+			<Output ItemName="RequestList" TaskParameter="Include"/>
+		</CreateItem>
+
+		<CreateItem Include="@(RequestList)"
+					Condition="(%(RequestList.Identity) == %(RequestList.SupportedBoard)) And (%(RequestList.FreqSpeed) == %(RequestList.SupportedFrequency) )"
+					AdditionalMetadata="IsSupportedBoard=true">
+			<Output ItemName="RequestList2" TaskParameter="Include"/>
+		</CreateItem>
+
+		<!-- Add requency information to boards with list types.  This is the request list-->
+		<CreateItem Include="@(BoardsWithBuildModeAndVersionAndCurrentBoard)" AdditionalMetadata="FreqMarker=%(SpeedList.Identity);FreqSpeed=%(SpeedList.Frequency)">
+			<Output ItemName="ListForCurrentBoard" TaskParameter="Include"/>
+		</CreateItem>
+
+		<!-- Add requency information to boards with list types.  This is the request list-->
+		<CreateItem Include="@(ListForCurrentBoard)"
+					Condition="(%(ListForCurrentBoard.Identity) == %(ListForCurrentBoard.CurrentBoard)) And
+											   (%(ListForCurrentBoard.FreqSpeed) == %(ListForCurrentBoard.CurrentFrequency) ) And
+											   (%(ListForCurrentBoard.BuildMode) == '$(DeploymentBuildMode)')"
+					AdditionalMetadata="IsCurrentBoardWithBuildMode=true">
+			<Output ItemName="ListForCurrentBoard2" TaskParameter="Include"/>
+		</CreateItem>
+
+		<!-- Add requency information to boards with list types.  This is the request list-->
+		<CreateItem Include="@(ListForCurrentBoard)"
+					Condition="(%(ListForCurrentBoard.Identity) == %(ListForCurrentBoard.CurrentBoard)) And
+											   (%(ListForCurrentBoard.FreqSpeed) == %(ListForCurrentBoard.CurrentFrequency) )"
+					AdditionalMetadata="IsCurrentBoard=true">
+			<Output ItemName="ListForCurrentBoard3" TaskParameter="Include"/>
+		</CreateItem>
+
+		<MSBuild.ExtensionPack.Framework.MsBuildHelper
+			TaskAction="GetItemCount"
+			InputItems1="@(RequestList2)"
+			Condition="(%(RequestList.Identity) == %(RequestList.SupportedBoard)) And (%(RequestList.FreqSpeed) == %(RequestList.SupportedFrequency) )" >
+			<Output TaskParameter="ItemCount" PropertyName="RequestListCount"/>
+		</MSBuild.ExtensionPack.Framework.MsBuildHelper>
+
+	<!--	<Message Importance="high" Text="Project.............: $(ProjectName)" />
+		<Message Importance="high" Text="Build Types.........: $(BuildTypeListCount)" />
+		<Message Importance="high" Text="Boards..............: $(BoardListCount)" />
+		<Message Importance="high" Text="Board Speeds........: $(SpeedListCount)" /> -->
+		<Message Importance="high" Text="Compilation Requests: $(RequestListCount)" />
+		<Message Importance="high" Text=" " />
+
+		<!-- delete the content of the report folder -->
+		<Exec Command="del /f /Q $(RootFolder)$(ReportFolder)\*.*" Condition="Exists('$(RootFolder)$(ReportFolder)')"/>
+		<!-- <Message Importance="high" Text="Compiling %(RequestList.Identity)-%(RequestList.Processor)-%(RequestList.Location)-%(RequestList.BuildMode)-%(RequestList.PostFix)-%(RequestList.FreqMarker)-%(RequestList.FreqSpeed)" />   -->
+	</Target>
+
+	<!-- Use for debugging purposes -->
+	<Target Name="Debug" DependsOnTargets="CreateProps" Inputs="@ListForCurrentBoard2" Outputs="%(ListForCurrentBoard2.Identity)-%(ListForCurrentBoard2.Processor)-%(ListForCurrentBoard2.Location)-%(ListForCurrentBoard2.BuildMode)-%(ListForCurrentBoard2.PostFix)-%(ListForCurrentBoard2.FreqMarker)-%(ListForCurrentBoard2.FreqSpeed)" >
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high" Text="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode)" Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode)=='true'"/>
+	</Target>	
+	
+	<!-- Compile the Code -->
+	<Target Name="Demo" DependsOnTargets="CreateProps" Inputs="@RequestList" Outputs="%(RequestList.Identity)-%(RequestList.Processor)-%(RequestList.Location)-%(RequestList.BuildMode)-%(RequestList.PostFix)-%(RequestList.FreqMarker)-%(RequestList.FreqSpeed)" >
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high" Text="Compiling Board:%(RequestList.Identity) Build Mode:%(RequestList.BuildMode) Frequency:%(RequestList.FreqSpeed) " Condition="(%(RequestList.Identity) == %(RequestList.SupportedBoard)) And (%(RequestList.FreqSpeed) == %(RequestList.SupportedFrequency) )"/>
+		<!--<Warning Text="Skipping Board:%(RequestList.Identity) Build Mode:%(RequestList.BuildMode) Frequency:%(RequestList.FreqSpeed)" Condition="(%(RequestList.Identity) != %(RequestList.SupportedBoard)) Or (%(RequestList.FreqSpeed) != %(RequestList.SupportedFrequency) )"/>-->
+
+	</Target>
+
+	<!-- Compile the Code -->
+	<Target Name="CompileAll"
+			DependsOnTargets="CreateProps"
+			Inputs="@RequestList2"
+			Outputs="%(RequestList2.Identity)-%(RequestList2.Processor)-%(RequestList2.Location)-%(RequestList2.BuildMode)-%(RequestList2.PostFix)-%(RequestList2.FreqMarker)-%(RequestList2.FreqSpeed)" >
+
+		<!-- Get current board name in order to do UPPER case -->
+		<CreateProperty Value="%(RequestList2.Identity)">
+			<Output TaskParameter="Value" PropertyName="BoardName" />
+		</CreateProperty>
+		
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high"
+				 Text="Compiling Board:%(RequestList2.Identity) Build Mode:%(RequestList2.BuildMode) Frequency:%(RequestList2.FreqSpeed)"
+				 Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify board sppeed in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='F_CPU=[0-9]*'
+											   Replacement='F_CPU=%(RequestList2.FreqSpeed)'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify target CPU in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='&lt;avrdevice&gt;.*&lt;/avrdevice&gt;'
+											   Replacement='&lt;avrdevice&gt;%(RequestList2.Processor)&lt;/avrdevice&gt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify USB Vendor ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='USB_VID=.*&lt;'
+											   Replacement='USB_VID=%(RequestList2.Vid)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify USB Product ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='USB_PID=.*&lt;'
+											   Replacement='USB_PID=%(RequestList2.Pid)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify Arduino version -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='ARDUINO=.*&lt;'
+											   Replacement='ARDUINO=%(RequestList2.ArduinoVersion)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify DEVBORD definition -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='DEVBOARD.*=1&lt;'
+											   Replacement='DEVBOARD_$(BoardName.ToUpper())=1&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Modify Libraries Arduino library speed - -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='Boards\\.*\\Headers'
+											   Replacement='Boards\%(RequestList2.Location)\Headers'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='Boards\\.*\\Libs\\\d{1,2}'
+											   Replacement='Boards\%(RequestList2.Location)\Libs\%(RequestList2.FreqMarker)'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+		
+		<Copy SourceFiles="$(RootFolder)$(ProjectName)"
+			  DestinationFiles="$(RootFolder)$(ReportFolder)\$(ProjectName)-%(RequestList2.Identity)-%(RequestList2.FreqSpeed)-%(RequestList2.BuildMode).txt"
+			  Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- only copy if file exist - Copy pins file from variant directory -->
+		<Exec Command="xcopy /Y %22$(TEX_HOME)\variants\%(RequestList2.Variant)\pins_arduino.h%22 %22$(RootFolder)pins_arduino.h%22 >nul"
+			  Condition="%(RequestList2.IsSupportedBoard) == 'true' And (Exists('$(RootFolder)pins_arduino.h'))"/>
+
+		<!-- Compile library - Force a rebuild so everyting is recompiled -->
+		<Exec Command="%22$(AtmelStudio)%22 %22$(RootFolder)$(ProjectName)%22 /rebuild %(RequestList2.BuildMode) /out %22$(RootFolder)$(ReportFolder)\%(RequestList2.Identity)-%(RequestList2.FreqSpeed)-%(RequestList2.BuildMode).txt%22"
+			  Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+
+		<!-- Copy library to destination folder and rename library to reflect frequency and build mode -->
+		<Copy SourceFiles="$(RootFolder)%(RequestList2.BuildMode)\$(LibraryName).hex"
+			  DestinationFiles="$(RootFolder)\$(StageFolder)\%(RequestList2.Location)\%(RequestList2.FreqMarker)\$(LibraryName)%(RequestList2.PostFix).hex"
+			  Condition="%(RequestList2.IsSupportedBoard) == 'true'"/> 
+
+		<!-- Copy eep file to destination folder -->
+		<Copy SourceFiles="$(RootFolder)%(RequestList2.BuildMode)\$(LibraryName).eep"
+			  DestinationFiles="$(RootFolder)\$(StageFolder)\%(RequestList2.Location)\%(RequestList2.FreqMarker)\$(LibraryName)%(RequestList2.PostFix).eep"
+			  Condition="%(RequestList2.IsSupportedBoard) == 'true'"/>
+	</Target>
+
+	<!-- Restore the project settings to use the current board -->
+	<Target Name="RestoreCurrentBoard"
+			DependsOnTargets="CompileAll"
+			Inputs="@ListForCurrentBoard2"
+			Outputs="%(ListForCurrentBoard2.Identity)-%(ListForCurrentBoard2.Processor)-%(ListForCurrentBoard2.Location)-%(ListForCurrentBoard2.BuildMode)-%(ListForCurrentBoard2.PostFix)-%(ListForCurrentBoard2.FreqMarker)-%(ListForCurrentBoard2.FreqSpeed)" >
+
+		<!-- Get current board name in order to do UPPER case -->
+		<CreateProperty Value="%(ListForCurrentBoard2.Identity)">
+			<Output TaskParameter="Value" PropertyName="BoardName" />
+		</CreateProperty>
+
+		<Message Importance="high" Text=" " />
+		<Message Importance="high"
+				 Text="Restoring Board:%(ListForCurrentBoard2.Identity) Build Mode:%(ListForCurrentBoard2.BuildMode) Frequency:%(ListForCurrentBoard2.FreqSpeed)"
+				 Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>		
+		
+		<!-- Modify board sppeed in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='F_CPU=[0-9]*'
+											   Replacement='F_CPU=%(ListForCurrentBoard2.FreqSpeed)'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify target CPU in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='&lt;avrdevice&gt;.*&lt;/avrdevice&gt;'
+											   Replacement='&lt;avrdevice&gt;%(ListForCurrentBoard2.Processor)&lt;/avrdevice&gt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify USB Vendor ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='USB_VID=.*&lt;'
+											   Replacement='USB_VID=%(ListForCurrentBoard2.Vid)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify USB Product ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='USB_PID=.*&lt;'
+											   Replacement='USB_PID=%(ListForCurrentBoard2.Pid)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify Arduino version -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='ARDUINO=.*&lt;'
+											   Replacement='ARDUINO=%(ListForCurrentBoard2.ArduinoVersion)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify DEVBORD definition -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='DEVBOARD.*=1&lt;'
+											   Replacement='DEVBOARD_$(BoardName.ToUpper())=1&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Setup headers directory -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='Boards\\.*\\Headers'
+											   Replacement='Boards\%(ListForCurrentBoard2.Location)\Headers'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Setup library directory-->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='Boards\\.*\\Libs\\\d{1,2}'
+											   Replacement='Boards\%(ListForCurrentBoard2.Location)\Libs\%(ListForCurrentBoard2.FreqMarker)'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Copy pins file from variant directory -->
+		<Exec Command="xcopy /Y %22$(TEX_HOME)\variants\%(ListForCurrentBoard2.Variant)\pins_arduino.h%22 %22$(RootFolder)pins_arduino.h%22 >nul"
+			  Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true' And Exists('$(RootFolder)pins_arduino.h')"/>
+	</Target>
+
+	<!-- Compile sketch for current board and deploy to stage directory -->
+	<Target Name="CompileCurrent" DependsOnTargets="CreateProps" 
+			Inputs="@ListForCurrentBoard3" 
+			Outputs="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'" >
+		
+		<!-- Get current board name in order to do UPPER case -->
+		<CreateProperty Value="%(ListForCurrentBoard3.Identity)">
+			<Output TaskParameter="Value" PropertyName="BoardName" />
+		</CreateProperty>
+		
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high"
+				 Text="Compiling Board:%(ListForCurrentBoard3.Identity) Build Mode:%(ListForCurrentBoard3.BuildMode) Frequency:%(ListForCurrentBoard3.FreqSpeed)"
+				 Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+		
+		<!-- Modify board sppeed in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File 
+			TaskAction="Replace" 
+			TextEncoding="ASCII"
+			RegexPattern='F_CPU=[0-9]*'
+			Replacement='F_CPU=%(ListForCurrentBoard3.FreqSpeed)'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+		
+		<!-- Modify target CPU in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='&lt;avrdevice&gt;.*&lt;/avrdevice&gt;'
+			Replacement='&lt;avrdevice&gt;%(ListForCurrentBoard3.Processor)&lt;/avrdevice&gt;'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!-- Modify USB Vendor ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='USB_VID=.*&lt;'
+			Replacement='USB_VID=%(ListForCurrentBoard3.Vid)&lt;'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!-- Modify USB Product ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='USB_PID=.*&lt;'
+			Replacement='USB_PID=%(ListForCurrentBoard3.Pid)&lt;'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!-- Modify Arduino version -->
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='ARDUINO=.*&lt;'
+			Replacement='ARDUINO=%(ListForCurrentBoard3.ArduinoVersion)&lt;'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!-- Modify DEVBORD definition -->
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='DEVBOARD.*=1&lt;'
+			Replacement='DEVBOARD_$(BoardName.ToUpper())=1&lt;'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!-- Modify Libraries Arduino library speed - -->
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='Boards\\.*\\Headers'
+			Replacement='Boards\%(ListForCurrentBoard3.Location)\Headers'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<MSBuild.ExtensionPack.FileSystem.File
+			TaskAction="Replace"
+			TextEncoding="ASCII"
+			RegexPattern='Boards\\.*\\Libs\\\d{1,2}'
+			Replacement='Boards\%(ListForCurrentBoard3.Location)\Libs\%(ListForCurrentBoard3.FreqMarker)'
+			Files="$(RootFolder)$(ProjectName)"
+			Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<Copy SourceFiles="$(RootFolder)$(ProjectName)"
+			  DestinationFiles="$(RootFolder)$(ReportFolder)\$(ProjectName)-%(ListForCurrentBoard3.Identity)-%(ListForCurrentBoard3.FreqSpeed)-%(ListForCurrentBoard3.BuildMode).txt" 
+			  Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!-- TODO: only copy if file exist - Copy pins file from variant directory -->
+		<Exec Command="xcopy /Y %22$(TEX_HOME)\variants\%(ListForCurrentBoard3.Variant)\pins_arduino.h%22 %22$(RootFolder)pins_arduino.h%22 >nul" 
+			  Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true' And (Exists('$(RootFolder)pins_arduino.h'))"/>
+
+		<!-- Compile library - Force a rebuild so everyting is recompiled -->
+		<Exec Command="%22$(AtmelStudio)%22 %22$(RootFolder)$(ProjectName)%22 /rebuild %(ListForCurrentBoard3.BuildMode) /out %22$(RootFolder)$(ReportFolder)\%(ListForCurrentBoard3.Identity)-%(ListForCurrentBoard3.FreqSpeed)-%(ListForCurrentBoard3.BuildMode).txt%22" 
+			  Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+
+		<!--<Copy SourceFiles="%(ListForCurrentBoard3.BuildMode)\libArduinoCore.a"  DestinationFiles="..\Stage\%(ListForCurrentBoard3.Location)\Libs\$(LibraryName)%(ListForCurrentBoard3.FreqMarker)%(ListForCurrentBoard3.PostFix).$(LibraryExtension)" />-->
+		<Copy SourceFiles="$(RootFolder)%(ListForCurrentBoard3.BuildMode)\$(LibraryName).hex" 
+			  DestinationFiles="$(RootFolder)\$(StageFolder)\%(ListForCurrentBoard3.Location)\%(ListForCurrentBoard3.FreqMarker)\$(LibraryName)%(ListForCurrentBoard3.PostFix).hex" 
+			  Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+		
+		<Copy SourceFiles="$(RootFolder)%(ListForCurrentBoard3.BuildMode)\$(LibraryName).eep"
+			  DestinationFiles="$(RootFolder)\$(StageFolder)\%(ListForCurrentBoard3.Location)\%(ListForCurrentBoard3.FreqMarker)\$(LibraryName)%(ListForCurrentBoard3.PostFix).eep" 
+			  Condition="%(ListForCurrentBoard3.IsCurrentBoard) == 'true'"/>
+	</Target>
+
+	<!-- Compile and deploy sketch to current board in the buildmode specified by '$(DeploymentBuildMode)'
+	     No restauration of the cppproj file is required since we are working with the current board
+		 - 06/06/2013 - OF - Refactored condition to be created during property generation
+	-->
+	<Target Name="DeployCurrent"
+			DependsOnTargets="CreateProps"
+			Inputs="@ListForCurrentBoard2"
+			Outputs="%(ListForCurrentBoard2.Identity)-%(ListForCurrentBoard2.Processor)-%(ListForCurrentBoard2.Location)-%(ListForCurrentBoard2.BuildMode)-%(ListForCurrentBoard2.PostFix)-%(ListForCurrentBoard2.FreqMarker)-%(ListForCurrentBoard2.FreqSpeed)" >
+
+		<!-- Get current board name in order to do UPPER case -->
+		<CreateProperty
+			Value="%(ListForCurrentBoard2.Identity)">
+			<Output TaskParameter="Value" PropertyName="BoardName" />
+		</CreateProperty>
+
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high"
+				 Text="Compiling Board:%(ListForCurrentBoard2.Identity) Build Mode:%(ListForCurrentBoard2.BuildMode) Frequency:%(ListForCurrentBoard2.FreqSpeed)"
+				 Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify board sppeed in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='F_CPU=[0-9]*'
+											   Replacement='F_CPU=%(ListForCurrentBoard2.FreqSpeed)'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify target device in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='&lt;avrdevice&gt;.*&lt;/avrdevice&gt;'
+											   Replacement='&lt;avrdevice&gt;%(ListForCurrentBoard2.Processor)&lt;/avrdevice&gt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify USB Vendor ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='USB_VID=.*&lt;'
+											   Replacement='USB_VID=%(ListForCurrentBoard2.Vid)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify USB Product ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='USB_PID=.*&lt;'
+											   Replacement='USB_PID=%(ListForCurrentBoard2.Pid)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify Arduino version -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='ARDUINO=.*&lt;'
+											   Replacement='ARDUINO=%(ListForCurrentBoard2.ArduinoVersion)&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify DEVBORD definition -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='DEVBOARD.*=1&lt;'
+											   Replacement='DEVBOARD_$(BoardName.ToUpper())=1&lt;'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify the directory from where the arduino library headers will be picked up to rflect targeted board -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='Boards\\.*\\Headers'
+											   Replacement='Boards\%(ListForCurrentBoard2.Location)\Headers'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Modify the directory from where the arduino libraries will be picked up to reflect targeted board -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace"
+											   TextEncoding="ASCII"
+											   RegexPattern='Boards\\.*\\Libs\\\d{1,2}'
+											   Replacement='Boards\%(ListForCurrentBoard2.Location)\Libs\%(ListForCurrentBoard2.FreqMarker)'
+											   Files="$(RootFolder)$(ProjectName)"
+											   Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<Copy SourceFiles="$(RootFolder)$(ProjectName)"
+			  DestinationFiles="$(RootFolder)$(ReportFolder)\$(ProjectName)-%(ListForCurrentBoard2.Identity)-%(ListForCurrentBoard2.FreqSpeed)-%(ListForCurrentBoard2.BuildMode).txt"
+			  Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- TODO: only copy if file exist - Copy pins file from variant directory -->
+		<Exec Command="xcopy /Y %22$(TEX_HOME)\variants\%(ListForCurrentBoard2.Variant)\pins_arduino.h%22 %22$(RootFolder)pins_arduino.h%22 >nul"
+			  Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true' And (Exists('$(RootFolder)pins_arduino.h'))"/>
+
+		<!-- Compile library - Force a rebuild so everyting is recompiled -->
+		<Exec Command="%22$(AtmelStudio)%22 %22$(RootFolder)$(ProjectName)%22 /rebuild %(ListForCurrentBoard2.BuildMode) /out %22$(RootFolder)$(ReportFolder)\%(ListForCurrentBoard2.Identity)-%(ListForCurrentBoard2.FreqSpeed)-%(ListForCurrentBoard2.BuildMode).txt%22"
+			  Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+		<!-- Compile library - Force a rebuild so everyting is recompiled -->
+		<Exec Command="%22$(TEX_HOME)\deploy.bat%22 %22$(RootFolder)%22 %22$(RootFolder)%22 %22$(ProjectName)%22"
+			  Condition="%(ListForCurrentBoard2.IsCurrentBoardWithBuildMode) == 'true'"/>
+
+	</Target>
+
+	<!-- Copy header files and change the timestamp of all the libraries -->
+	<Target Name="CopyHeaderFiles" DependsOnTargets="Compile" Inputs="@RequestList" Outputs="%(RequestList.Identity)" >
+
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high" Text="Copy header files for board:%(RequestList.Identity)" Condition="%(RequestList.EnableForLibCompilation) == true"/>
+
+		<!-- Copy library to destination folder and rename library to reflect frequency and build mode -->
+		<Exec Command="xcopy /s /Y /I *.h ..\Stage\%(RequestList.Location)\Headers\ >nul" Condition="%(RequestList.EnableForLibCompilation) == true" />
+
+		<!-- Copy pins file from variant directory -->
+		<Exec Command="xcopy /Y ..\variants\%(RequestList.Variant)\pins_arduino.h ..\Stage\%(RequestList.Location)\Headers\pins_arduino.h >nul" Condition="%(RequestList.EnableForLibCompilation) == true"/>
+
+	</Target>
+
+	<!-- Copy header files and change the timestamp of all the libraries -->
+	<Target Name="RestoreProjectFile" DependsOnTargets="CopyHeaderFiles" >
+		<!-- Show board and mode for which we are compiling -->
+		<Message Importance="high" Text="Restoring Project File" />
+
+		<!-- Modify board sppeed in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace" TextEncoding="ASCII"  RegexPattern='F_CPU=[0-9]*'  Replacement='F_CPU=$(PreferredFrequency)'  Files="$(ProjectName)"/>
+
+		<!-- Modify target CPU in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace" TextEncoding="ASCII"  RegexPattern='&lt;avrdevice&gt;.*&lt;/avrdevice&gt;'  Replacement='&lt;avrdevice&gt;$(PreferredDevice)&lt;/avrdevice&gt;'  Files="$(ProjectName)"/>
+
+		<!-- Modify USB Vendor ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace" TextEncoding="ASCII"  RegexPattern='USB_VID=.*&lt;'  Replacement='USB_VID=$(PreferredVid)&lt;'  Files="$(ProjectName)"/>
+
+		<!-- Modify USB Product ID in project file -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace" TextEncoding="ASCII"  RegexPattern='USB_PID=.*&lt;'  Replacement='USB_PID=$(PreferredPid)&lt;'  Files="$(ProjectName)"/>
+
+		<!-- Modify Headers Arduino library speed - -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace" TextEncoding="ASCII"  RegexPattern='Stage/.*/Headers'  Replacement='Stage/$(PreferredBoard)/Headers'  Files="$(ProjectName)"/>
+
+		<!-- Modify Libraries Arduino library speed - -->
+		<MSBuild.ExtensionPack.FileSystem.File TaskAction="Replace" TextEncoding="ASCII"  RegexPattern='Stage/.*/Libs/\d{1,2}'  Replacement='Stage/$(PreferredBoard)/Libs/$(PreferredFrequencyDirectory)'  Files="$(ProjectName)"/>
+
+	</Target>
+
+	<!-- Copy header files and change the timestamp of all the libraries -->
+	<Target Name="ReplacePinsHeader" DependsOnTargets="RestoreProjectFile" Outputs="%(RequestList.Identity)">
+
+		<Message Importance="high" Text="Restoring pins_arduino from variant %(RequestList.Variant)" Condition="%(RequestList.Identity) == $(PreferredBoard)"/>
+
+		<!-- Copy the standard pins_arduino file to the source code since IDE development defaults to Arduino UNO -->
+		<Copy SourceFiles="..\variants\%(RequestList.Variant)\pins_arduino.h"   DestinationFiles="pins_arduino.h" Condition="%(RequestList.Identity) == $(PreferredBoard)"/>
+	</Target>
+
+	<!-- Entry Point -->
+	<Target Name="Start"  >
+		<Message Importance="high" Text="Building $(ProjectName) project"/>
+		<Message Importance="high" Text="Output File $(LibraryName)"/>
+		<Message Importance="high" Text="Atmel Studio: $(AtmelStudio)"/>
+		<WriteLinesToFile File="$(CommandLineSignalFile)" Lines="CommandLineIsOn" Overwrite="true"/>
+		<CallTarget Targets="$(TargetStep)" />
+		<Exec Command="del /f /Q $(CommandLineSignalFile)" Condition="Exists('$(CommandLineSignalFile)')"/>
+		<Message Importance="high" Text="Finished $(ProjectName) project"/>
+	</Target>
+
+</Project>

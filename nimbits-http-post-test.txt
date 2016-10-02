@@ -1,0 +1,22 @@
+POST /service/v2/value HTTP/1.1
+Host: phnimb.appspot.com
+Connection: close
+User-Agent: Arduino/1.0
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 64
+
+key=testkey&json={"d":258,"n":""}&id=petr.hruby@gmail.com/DPTemp
+
+
+
+
+POST /service/v2/value HTTP/1.1
+Host: phnimb.appspot.com
+Connection: close
+User-Agent: Arduino/1.0
+Cache-Control: max-age=0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 91
+
+email=petr.hruby@gmail.com&key=testkey&json={"d":258,"n":""}&id=petr.hruby@gmail.com/DPTemp
